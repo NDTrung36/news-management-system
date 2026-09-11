@@ -25,3 +25,6 @@ Thumbs.db
 
 # Logs
 *.log
+
+# Properties containing secrets
+src/main/resources/db.properties
