@@ -18,6 +18,7 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+@EnabledIfSystemProperty(named = "runDbTests", matches = "true")
 public class GenericDaoCategoryCrudIntegrationTest {
 
     private static final String TEST_CODE = "jdbc-test-category";
@@ -73,21 +74,19 @@ public class GenericDaoCategoryCrudIntegrationTest {
     }
 
     private void cleanupTestData() {
-        try {
-            genericDAO.delete("DELETE FROM category WHERE code = ?", TEST_CODE);
-        } catch (Exception ignored) {
-            // Ignore if database is not reachable during teardown in non-DB runs
-        }
+        genericDAO.delete("DELETE FROM category WHERE code = ?", TEST_CODE);
     }
 
     @Test
     @DisplayName("Verify complete CRUD lifecycle on Category table using GenericDAO")
-    @EnabledIfSystemProperty(named = "runDbTests", matches = "true")
     public void testCategoryCrudLifecycle() {
         // Step 1: Precondition cleanup verified
         String selectSql = "SELECT id, name, code, created_date, modified_date FROM category WHERE code = ?";
         CategoryRow initialCheck = genericDAO.queryOne(selectSql, categoryMapper, TEST_CODE);
         assertNull(initialCheck, "Precondition failed: test record already exists");
+
+        String countSql = "SELECT COUNT(*) FROM category";
+        long baselineCount = genericDAO.count(countSql);
 
         // Step 2: CREATE
         String insertSql = "INSERT INTO category (name, code) VALUES (?, ?)";
@@ -118,9 +117,8 @@ public class GenericDaoCategoryCrudIntegrationTest {
         assertEquals(UPDATED_NAME, updated.getName(), "Category name should reflect update");
 
         // Step 6: COUNT
-        String countSql = "SELECT COUNT(*) FROM category";
-        long totalCount = genericDAO.count(countSql);
-        assertTrue(totalCount >= 5, "Total categories should include seed data plus test record");
+        long countAfterInsert = genericDAO.count(countSql);
+        assertEquals(baselineCount + 1, countAfterInsert, "Total categories should increase by 1");
 
         // Step 7: DELETE
         String deleteSql = "DELETE FROM category WHERE code = ?";
@@ -130,5 +128,8 @@ public class GenericDaoCategoryCrudIntegrationTest {
         // Step 8: READ AFTER DELETE
         CategoryRow afterDelete = genericDAO.queryOne(selectSql, categoryMapper, TEST_CODE);
         assertNull(afterDelete, "Category should not exist after deletion");
+
+        long countAfterDelete = genericDAO.count(countSql);
+        assertEquals(baselineCount, countAfterDelete, "Total categories should return to baseline after delete");
     }
 }

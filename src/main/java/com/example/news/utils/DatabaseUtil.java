@@ -15,16 +15,28 @@ public final class DatabaseUtil {
     private static final String KEY_URL = "db.url";
     private static final String KEY_USERNAME = "db.username";
     private static final String KEY_PASSWORD = "db.password";
+    private static final String KEY_DRIVER = "db.driver";
+    private static final Properties PROPERTIES = loadProperties();
+
+    static {
+        String driver = PROPERTIES.getProperty(KEY_DRIVER);
+        if (driver != null && !driver.trim().isEmpty()) {
+            try {
+                Class.forName(driver.trim());
+            } catch (ClassNotFoundException e) {
+                throw new DatabaseException("Database driver class not found: " + driver, e);
+            }
+        }
+    }
 
     private DatabaseUtil() {
         // Prevent instantiation
     }
 
     public static Connection getConnection() {
-        Properties properties = loadProperties();
-        String url = properties.getProperty(KEY_URL);
-        String username = properties.getProperty(KEY_USERNAME);
-        String password = properties.getProperty(KEY_PASSWORD, "");
+        String url = PROPERTIES.getProperty(KEY_URL);
+        String username = PROPERTIES.getProperty(KEY_USERNAME);
+        String password = PROPERTIES.getProperty(KEY_PASSWORD, "");
 
         if (url == null || url.trim().isEmpty()) {
             throw new DatabaseException("Missing required property: " + KEY_URL);

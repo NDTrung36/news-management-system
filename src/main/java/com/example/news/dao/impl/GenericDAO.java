@@ -98,7 +98,7 @@ public class GenericDAO implements IGenericDAO {
                 if (resultSet.next()) {
                     return resultSet.getLong(1);
                 }
-                return 0L;
+                throw new DatabaseException("Count query did not return any results: " + sql);
             }
         } catch (SQLException e) {
             throw new DatabaseException("Error executing count: " + sql, e);
