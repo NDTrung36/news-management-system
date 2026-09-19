@@ -1,33 +1,32 @@
 package com.example.news.controller.web;
 
-import java.io.IOException;
-
-import com.example.news.exception.AuthenticationException;
+import com.example.news.exception.ValidationException;
+import com.example.news.model.RegisterForm;
 import com.example.news.security.AuthSession;
-import com.example.news.security.AuthenticatedUser;
 import com.example.news.security.CsrfTokenManager;
 import com.example.news.service.IAuthService;
 import com.example.news.service.impl.AuthService;
+
 import javax.servlet.RequestDispatcher;
 import javax.servlet.ServletException;
 import javax.servlet.annotation.WebServlet;
 import javax.servlet.http.HttpServlet;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
-import javax.servlet.http.HttpSession;
+import java.io.IOException;
 
-@WebServlet("/login")
-public class LoginController extends HttpServlet {
+@WebServlet("/register")
+public class RegisterController extends HttpServlet {
 
     private final IAuthService authService;
     private final AuthSession authSession;
     private final CsrfTokenManager csrfTokenManager;
 
-    public LoginController() {
+    public RegisterController() {
         this(new AuthService(), new AuthSession(), new CsrfTokenManager());
     }
 
-    public LoginController(IAuthService authService, AuthSession authSession, CsrfTokenManager csrfTokenManager) {
+    public RegisterController(IAuthService authService, AuthSession authSession, CsrfTokenManager csrfTokenManager) {
         this.authService = authService;
         this.authSession = authSession;
         this.csrfTokenManager = csrfTokenManager;
@@ -41,13 +40,7 @@ public class LoginController extends HttpServlet {
             response.sendRedirect(request.getContextPath() + "/home");
             return;
         }
-        if ("1".equals(request.getParameter("registered"))) {
-            request.setAttribute("message", "Đăng ký thành công. Hãy đăng nhập để tiếp tục.");
-        }
-        if ("1".equals(request.getParameter("loggedOut"))) {
-            request.setAttribute("message", "Bạn đã đăng xuất.");
-        }
-        forwardToLoginPage(request, response);
+        forwardToRegisterPage(request, response);
     }
 
     @Override
@@ -60,24 +53,28 @@ public class LoginController extends HttpServlet {
             return;
         }
 
-        String username = request.getParameter("username");
-        String password = request.getParameter("password");
-
+        RegisterForm form = new RegisterForm(
+                request.getParameter("username"),
+                request.getParameter("password"),
+                request.getParameter("confirmPassword"),
+                request.getParameter("fullName"),
+                request.getParameter("email"));
         try {
-            AuthenticatedUser user = authService.login(username, password);
-            authSession.signIn(request, user);
-            response.sendRedirect(request.getContextPath() + "/home");
-        } catch (AuthenticationException e) {
+            authService.register(form);
+            response.sendRedirect(request.getContextPath() + "/login?registered=1");
+        } catch (ValidationException e) {
             request.setAttribute("error", e.getMessage());
-            request.setAttribute("username", username == null ? "" : username.trim());
-            forwardToLoginPage(request, response);
+            request.setAttribute("username", form.getUsername());
+            request.setAttribute("fullName", form.getFullName());
+            request.setAttribute("email", form.getEmail());
+            forwardToRegisterPage(request, response);
         }
     }
 
-    private void forwardToLoginPage(HttpServletRequest request, HttpServletResponse response)
+    private void forwardToRegisterPage(HttpServletRequest request, HttpServletResponse response)
             throws ServletException, IOException {
         request.setAttribute("csrfToken", csrfTokenManager.ensureToken(request));
-        RequestDispatcher dispatcher = request.getRequestDispatcher("/WEB-INF/views/login.jsp");
+        RequestDispatcher dispatcher = request.getRequestDispatcher("/WEB-INF/views/register.jsp");
         dispatcher.forward(request, response);
     }
 }

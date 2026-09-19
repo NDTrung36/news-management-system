@@ -50,8 +50,16 @@ public class GenericDAO implements IGenericDAO {
 
     @Override
     public long insert(String sql, Object... parameters) {
-        try (Connection connection = DatabaseUtil.getConnection();
-             PreparedStatement statement = connection.prepareStatement(sql, Statement.RETURN_GENERATED_KEYS)) {
+        try (Connection connection = DatabaseUtil.getConnection()) {
+            return insert(connection, sql, parameters);
+        } catch (SQLException e) {
+            throw new DatabaseException("Error closing connection after insert: " + sql, e);
+        }
+    }
+
+    @Override
+    public long insert(Connection connection, String sql, Object... parameters) {
+        try (PreparedStatement statement = connection.prepareStatement(sql, Statement.RETURN_GENERATED_KEYS)) {
 
             setParameters(statement, parameters);
             int affectedRows = statement.executeUpdate();
@@ -73,8 +81,16 @@ public class GenericDAO implements IGenericDAO {
 
     @Override
     public int update(String sql, Object... parameters) {
-        try (Connection connection = DatabaseUtil.getConnection();
-             PreparedStatement statement = connection.prepareStatement(sql)) {
+        try (Connection connection = DatabaseUtil.getConnection()) {
+            return update(connection, sql, parameters);
+        } catch (SQLException e) {
+            throw new DatabaseException("Error closing connection after update: " + sql, e);
+        }
+    }
+
+    @Override
+    public int update(Connection connection, String sql, Object... parameters) {
+        try (PreparedStatement statement = connection.prepareStatement(sql)) {
 
             setParameters(statement, parameters);
             return statement.executeUpdate();

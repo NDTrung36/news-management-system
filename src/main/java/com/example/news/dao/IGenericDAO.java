@@ -2,6 +2,7 @@ package com.example.news.dao;
 
 import com.example.news.mapper.RowMapper;
 
+import java.sql.Connection;
 import java.util.List;
 
 public interface IGenericDAO {
@@ -12,7 +13,11 @@ public interface IGenericDAO {
 
     long insert(String sql, Object... parameters);
 
+    long insert(Connection connection, String sql, Object... parameters);
+
     int update(String sql, Object... parameters);
+
+    int update(Connection connection, String sql, Object... parameters);
 
     int delete(String sql, Object... parameters);
 

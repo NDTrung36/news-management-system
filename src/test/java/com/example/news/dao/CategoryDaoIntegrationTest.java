@@ -1,6 +1,7 @@
 package com.example.news.dao;
 
 import com.example.news.dao.impl.CategoryDAO;
+import com.example.news.dao.impl.GenericDAO;
 import com.example.news.model.CategoryModel;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -21,12 +22,16 @@ public class CategoryDaoIntegrationTest {
     private static final String TEST_NAME = "DAO Integration Category";
     private static final String UPDATED_CODE = "dao-int-code-upd";
     private static final String UPDATED_NAME = "DAO Integration Category Updated";
+    private static final String USED_CATEGORY_CODE = "dao-int-used-category";
+    private static final String UNUSED_CATEGORY_CODE = "dao-int-unused-category";
 
     private ICategoryDAO categoryDAO;
+    private GenericDAO genericDAO;
 
     @BeforeEach
     public void setUp() {
         categoryDAO = new CategoryDAO();
+        genericDAO = new GenericDAO();
         cleanupTestData();
     }
 
@@ -36,6 +41,8 @@ public class CategoryDaoIntegrationTest {
     }
 
     private void cleanupTestData() {
+        genericDAO.delete("DELETE n FROM news n JOIN category c ON c.id = n.category_id WHERE c.code IN (?, ?)",
+                USED_CATEGORY_CODE, UNUSED_CATEGORY_CODE);
         CategoryModel byCode = categoryDAO.findByCode(TEST_CODE);
         if (byCode != null) {
             categoryDAO.delete(byCode.getId());
@@ -43,6 +50,14 @@ public class CategoryDaoIntegrationTest {
         CategoryModel byUpdatedCode = categoryDAO.findByCode(UPDATED_CODE);
         if (byUpdatedCode != null) {
             categoryDAO.delete(byUpdatedCode.getId());
+        }
+        CategoryModel usedCategory = categoryDAO.findByCode(USED_CATEGORY_CODE);
+        if (usedCategory != null) {
+            categoryDAO.delete(usedCategory.getId());
+        }
+        CategoryModel unusedCategory = categoryDAO.findByCode(UNUSED_CATEGORY_CODE);
+        if (unusedCategory != null) {
+            categoryDAO.delete(unusedCategory.getId());
         }
     }
 
@@ -116,17 +131,21 @@ public class CategoryDaoIntegrationTest {
     }
 
     @Test
-    @DisplayName("countNewsByCategoryId should return positive count for categories in use and 0 for unused")
+    @DisplayName("countNewsByCategoryId should return positive count for a referenced category and 0 for unused")
     @EnabledIfSystemProperty(named = "runDbTests", matches = "true")
     public void testCountNewsByCategoryId() {
-        CategoryModel javaCategory = categoryDAO.findByCode("java");
-        assertNotNull(javaCategory);
-        long javaNewsCount = categoryDAO.countNewsByCategoryId(javaCategory.getId());
-        assertTrue(javaNewsCount > 0, "Java category should have associated news");
+        long usedCategoryId = categoryDAO.insert(new CategoryModel("DAO Used Category", USED_CATEGORY_CODE));
+        long unusedCategoryId = categoryDAO.insert(new CategoryModel("DAO Unused Category", UNUSED_CATEGORY_CODE));
+        Long createdById = genericDAO.queryOne("SELECT id FROM `user` ORDER BY id LIMIT 1",
+                resultSet -> resultSet.getLong("id"));
+        assertNotNull(createdById, "Test database must contain a user for the news fixture");
 
-        CategoryModel programmingCategory = categoryDAO.findByCode("programming");
-        assertNotNull(programmingCategory);
-        long progNewsCount = categoryDAO.countNewsByCategoryId(programmingCategory.getId());
-        assertEquals(0, progNewsCount, "Programming category should have 0 news");
+        genericDAO.insert("INSERT INTO news (title, short_description, content, thumbnail, category_id, created_by) "
+                        + "VALUES (?, ?, ?, ?, ?, ?)",
+                "DAO category count test", "Temporary integration-test news", "Temporary integration-test content",
+                null, usedCategoryId, createdById);
+
+        assertEquals(1L, categoryDAO.countNewsByCategoryId(usedCategoryId));
+        assertEquals(0L, categoryDAO.countNewsByCategoryId(unusedCategoryId));
     }
 }
