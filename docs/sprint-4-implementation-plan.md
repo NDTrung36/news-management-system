@@ -58,7 +58,7 @@ COMMIT
 
 Nếu role USER không tồn tại hoặc bất kỳ bước ghi nào thất bại, rollback toàn bộ. Người đăng ký không được truyền role hoặc status để thay đổi giá trị mặc định của server. Việc gán role USER chuẩn bị dữ liệu cho Sprint 5, chưa thực hiện kiểm tra quyền admin ở Sprint 4.
 
-Thay đổi framework cần thiết: bổ sung overload `insert(Connection, ...)` và `update(Connection, ...)` vào `IGenericDAO`/`GenericDAO`. Overload dùng connection do caller cấp chỉ đóng statement/result set; caller sở hữu connection và transaction. API cũ vẫn tự mở/đóng connection và giữ nguyên hành vi Category CRUD. Tách phần thực thi JDBC dùng chung để tránh duplicate code giữa hai API. `UserDAO` quản lý commit/rollback và đóng connection; Service không nhận `java.sql.Connection`.
+Thay đổi framework cần thiết: toàn bộ vòng đời JDBC được tập trung trong `GenericDAO`. Contract `IGenericDAO` không public overload nhận `Connection`; thay vào đó cung cấp `executeInTransaction(...)`. Callback nhận một `IGenericDAO` transaction-scoped để chạy nhiều câu SQL trên cùng connection mà không làm lộ connection ra DAO nghiệp vụ. `GenericDAO` sở hữu việc mở connection, commit/rollback, đóng connection và đóng statement/result set bằng try-with-resources. `CategoryDAO` và `UserDAO` kế thừa `GenericDAO`, chỉ truyền SQL, mapper và tham số; không import `DatabaseUtil` hoặc `java.sql.Connection`. Service cũng không nhận connection.
 
 Chỉ chuyển lỗi duplicate-key đã nhận diện thành `DuplicateUserException`, sau đó Service đổi thành validation phù hợp. Trường hợp hai request cùng vượt qua pre-check vẫn phải trả thông báo duplicate, không thành lỗi 500. Các lỗi kết nối/SQL khác giữ nguyên nguyên nhân; rollback lỗi không được che mất lỗi gốc. Không chạy lại `schema.sql` vì script hiện có DROP TABLE.
 
@@ -93,7 +93,8 @@ Bước 6 — Kiểm chứng
 | AuthService Login | User không tồn tại, password sai, status bị khóa, thành công; các failure thông thường cùng thông báo |
 | DAO/MySQL | Mapping user, generated ID, user và role được tạo cùng nhau; thiếu role/lỗi mapping rollback không để lại user; duplicate được nhận diện |
 | Controller/session | Forward lỗi giữ field an toàn, redirect thành công, session ID thay đổi, session không chứa credential/hash, logout/expired session, CSRF sai |
-| Regression | Toàn bộ test Sprint 1–3 và Category CRUD vẫn hoạt động sau khi bổ sung Connection overload |
+| Regression | Toàn bộ test Sprint 1–3 và Category CRUD vẫn hoạt động sau khi tập trung resource/transaction ownership vào GenericDAO |
+| JDBC resource | Connection, statement và result set đều đóng ở success/failure; transaction dùng đúng một connection, commit khi thành công và rollback khi lỗi |
 | Tomcat | Register → Login → Home → Logout → Home hiển thị Guest; route/JSP/session cookie đúng ở context path của WAR |
 
 Service test dùng fake DAO và fake hasher để kiểm tra business rule nhanh; PasswordHasher test dùng BCrypt thật. Controller/session test dùng Servlet mocks tương thích Java 8 và JDK chạy build. DB integration test opt-in theo `runDbTests`; tạo fixture với username/email riêng cho từng run, cleanup bằng ID đã tạo, không xóa dữ liệu seed hoặc dựa vào password seed chưa được xác nhận.
