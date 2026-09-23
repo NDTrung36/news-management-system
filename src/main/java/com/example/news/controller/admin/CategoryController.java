@@ -2,6 +2,8 @@ package com.example.news.controller.admin;
 
 import com.example.news.exception.ValidationException;
 import com.example.news.model.CategoryModel;
+import com.example.news.model.CategoryListCriteria;
+import com.example.news.model.PageResult;
 import com.example.news.security.CsrfTokenManager;
 import com.example.news.service.ICategoryService;
 import com.example.news.service.impl.CategoryService;
@@ -88,7 +90,19 @@ public class CategoryController extends HttpServlet {
         if ("notFound".equals(errorParam)) {
             request.setAttribute("error", "Category not found");
         }
-        request.setAttribute("categories", categoryService.findAll());
+
+        CategoryListCriteria criteria = parseCriteria(request);
+        PageResult<CategoryModel> pageResult;
+        try {
+            pageResult = categoryService.search(criteria);
+        } catch (ValidationException e) {
+            request.setAttribute("error", e.getMessage());
+            criteria = new CategoryListCriteria("", criteria.getSortName(), criteria.getSortBy(), 1);
+            pageResult = categoryService.search(criteria);
+        }
+
+        request.setAttribute("criteria", criteria);
+        request.setAttribute("pageResult", pageResult);
         RequestDispatcher dispatcher = request.getRequestDispatcher("/WEB-INF/views/admin/category/list.jsp");
         dispatcher.forward(request, response);
     }
@@ -190,9 +204,7 @@ public class CategoryController extends HttpServlet {
             response.sendRedirect(request.getContextPath() + "/admin/category");
         } catch (ValidationException e) {
             request.setAttribute("error", e.getMessage());
-            request.setAttribute("categories", categoryService.findAll());
-            RequestDispatcher dispatcher = request.getRequestDispatcher("/WEB-INF/views/admin/category/list.jsp");
-            dispatcher.forward(request, response);
+            showList(request, response);
         }
     }
 
@@ -209,5 +221,24 @@ public class CategoryController extends HttpServlet {
 
     private void prepareCsrfToken(HttpServletRequest request) {
         request.setAttribute("csrfToken", csrfTokenManager.ensureToken(request));
+    }
+
+    private CategoryListCriteria parseCriteria(HttpServletRequest request) {
+        return new CategoryListCriteria(
+                request.getParameter("search"),
+                request.getParameter("sortName"),
+                request.getParameter("sortBy"),
+                parsePage(request.getParameter("page")));
+    }
+
+    private int parsePage(String pageParameter) {
+        if (pageParameter == null || pageParameter.trim().isEmpty()) {
+            return CategoryListCriteria.DEFAULT_PAGE;
+        }
+        try {
+            return Integer.parseInt(pageParameter.trim());
+        } catch (NumberFormatException e) {
+            return CategoryListCriteria.DEFAULT_PAGE;
+        }
     }
 }

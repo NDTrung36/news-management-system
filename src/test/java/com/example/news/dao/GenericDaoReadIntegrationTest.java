@@ -3,6 +3,7 @@ package com.example.news.dao;
 import com.example.news.dao.impl.GenericDAO;
 import com.example.news.mapper.RowMapper;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.condition.EnabledIfSystemProperty;
@@ -19,11 +20,20 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 public class GenericDaoReadIntegrationTest {
 
+    private static final String FIXTURE_CODE = "generic-read-fixture";
+
     private IGenericDAO genericDAO;
 
     @BeforeEach
     public void setUp() {
         genericDAO = new GenericDAO();
+        genericDAO.delete("DELETE FROM category WHERE code = ?", FIXTURE_CODE);
+        genericDAO.insert("INSERT INTO category (name, code) VALUES (?, ?)", "Generic Read Fixture", FIXTURE_CODE);
+    }
+
+    @AfterEach
+    public void tearDown() {
+        genericDAO.delete("DELETE FROM category WHERE code = ?", FIXTURE_CODE);
     }
 
     private static class CategoryRow {
@@ -65,7 +75,8 @@ public class GenericDaoReadIntegrationTest {
         List<CategoryRow> categories = genericDAO.query(sql, categoryMapper);
 
         assertNotNull(categories, "Result list should not be null");
-        assertTrue(categories.size() >= 4, "Should have at least 4 seed categories");
+        assertTrue(categories.stream().anyMatch(category -> FIXTURE_CODE.equals(category.getCode())),
+                "Should return the category fixture created by this test");
     }
 
     @Test
@@ -73,11 +84,11 @@ public class GenericDaoReadIntegrationTest {
     @EnabledIfSystemProperty(named = "runDbTests", matches = "true")
     public void testQueryOneCategory() {
         String sql = "SELECT id, name, code, created_date FROM category WHERE code = ?";
-        CategoryRow found = genericDAO.queryOne(sql, categoryMapper, "java");
+        CategoryRow found = genericDAO.queryOne(sql, categoryMapper, FIXTURE_CODE);
 
-        assertNotNull(found, "Category 'java' should exist");
-        assertEquals("Java", found.getName());
-        assertEquals("java", found.getCode());
+        assertNotNull(found, "The category fixture should exist");
+        assertEquals("Generic Read Fixture", found.getName());
+        assertEquals(FIXTURE_CODE, found.getCode());
 
         CategoryRow notFound = genericDAO.queryOne(sql, categoryMapper, "non_existent_code_xyz");
         assertNull(notFound, "Should return null when no record matches");
@@ -90,6 +101,6 @@ public class GenericDaoReadIntegrationTest {
         String sql = "SELECT COUNT(*) FROM category";
         long total = genericDAO.count(sql);
 
-        assertTrue(total >= 4, "Category count should be at least 4");
+        assertTrue(total >= 1, "Category count should include the category fixture");
     }
 }

@@ -1,8 +1,11 @@
 package com.example.news.service;
 
 import com.example.news.dao.ICategoryDAO;
+import com.example.news.exception.DatabaseException;
 import com.example.news.exception.ValidationException;
 import com.example.news.model.CategoryModel;
+import com.example.news.model.CategoryListCriteria;
+import com.example.news.model.PageResult;
 import com.example.news.service.impl.CategoryService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -11,7 +14,9 @@ import org.junit.jupiter.api.Test;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
+import java.sql.SQLException;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -159,10 +164,66 @@ public class CategoryServiceTest {
         assertEquals(0, fakeCategoryDAO.findAll().size());
     }
 
+    @Test
+    @DisplayName("search should normalize criteria and calculate pagination")
+    public void testSearchPagination() {
+        categoryService.create(new CategoryModel("Java", "java"));
+        categoryService.create(new CategoryModel("Technology", "technology"));
+
+        CategoryListCriteria criteria = new CategoryListCriteria("  java  ", "unsupported", "invalid", 0);
+        PageResult<CategoryModel> result = categoryService.search(criteria);
+
+        assertEquals("java", criteria.getSearch());
+        assertEquals("id", criteria.getSortName());
+        assertEquals("asc", criteria.getSortBy());
+        assertEquals(1, result.getPage());
+        assertEquals(1, result.getTotalPages());
+        assertEquals(1L, result.getTotalItems());
+        assertEquals("java", result.getItems().get(0).getCode());
+        assertFalse(result.hasPrevious());
+        assertFalse(result.hasNext());
+    }
+
+    @Test
+    @DisplayName("search should reject a search term longer than the supported limit")
+    public void testSearchTooLong() {
+        String longSearch = new String(new char[101]).replace('\0', 'a');
+
+        ValidationException ex = assertThrows(ValidationException.class,
+                () -> categoryService.search(new CategoryListCriteria(longSearch, "id", "asc", 1)));
+
+        assertTrue(ex.getMessage().contains("100"));
+    }
+
+    @Test
+    @DisplayName("create should map a concurrent duplicate code to validation error")
+    public void testCreateConcurrentDuplicateCode() {
+        fakeCategoryDAO.throwDuplicateOnInsert = true;
+
+        ValidationException ex = assertThrows(ValidationException.class,
+                () -> categoryService.create(new CategoryModel("Java", "java")));
+
+        assertTrue(ex.getMessage().contains("already exists"));
+    }
+
+    @Test
+    @DisplayName("delete should map a foreign key violation to validation error")
+    public void testDeleteForeignKeyViolation() {
+        long id = categoryService.create(new CategoryModel("News Category", "news-category"));
+        fakeCategoryDAO.throwForeignKeyOnDelete = true;
+
+        ValidationException ex = assertThrows(ValidationException.class,
+                () -> categoryService.delete(id));
+
+        assertTrue(ex.getMessage().contains("news"));
+    }
+
     private static class FakeCategoryDAO implements ICategoryDAO {
         private final Map<Long, CategoryModel> storage = new HashMap<>();
         private final Map<Long, Long> newsCountMap = new HashMap<>();
         private long autoIncrementId = 1L;
+        private boolean throwDuplicateOnInsert;
+        private boolean throwForeignKeyOnDelete;
 
         public void setNewsCount(Long categoryId, Long count) {
             newsCountMap.put(categoryId, count);
@@ -171,6 +232,30 @@ public class CategoryServiceTest {
         @Override
         public List<CategoryModel> findAll() {
             return new ArrayList<>(storage.values());
+        }
+
+        @Override
+        public List<CategoryModel> findPage(CategoryListCriteria criteria, long offset, int limit) {
+            List<CategoryModel> matches = new ArrayList<>();
+            String search = criteria == null || criteria.getSearch() == null
+                    ? "" : criteria.getSearch().toLowerCase(Locale.ROOT);
+            for (CategoryModel model : storage.values()) {
+                if (search.isEmpty()
+                        || model.getName().toLowerCase(Locale.ROOT).contains(search)
+                        || model.getCode().toLowerCase(Locale.ROOT).contains(search)) {
+                    matches.add(model);
+                }
+            }
+            int fromIndex = (int) Math.min(offset, matches.size());
+            int toIndex = Math.min(fromIndex + limit, matches.size());
+            return new ArrayList<>(matches.subList(fromIndex, toIndex));
+        }
+
+        @Override
+        public long countBySearch(String search) {
+            String normalizedSearch = search == null ? "" : search.toLowerCase(Locale.ROOT);
+            return findPage(new CategoryListCriteria(normalizedSearch, "id", "asc", 1), 0,
+                    Integer.MAX_VALUE).size();
         }
 
         @Override
@@ -190,6 +275,10 @@ public class CategoryServiceTest {
 
         @Override
         public long insert(CategoryModel category) {
+            if (throwDuplicateOnInsert) {
+                throw new DatabaseException("duplicate category code",
+                        new SQLException("duplicate", "23000", 1062));
+            }
             long newId = autoIncrementId++;
             CategoryModel saved = new CategoryModel(newId, category.getName(), category.getCode());
             storage.put(newId, saved);
@@ -207,6 +296,10 @@ public class CategoryServiceTest {
 
         @Override
         public int delete(Long id) {
+            if (throwForeignKeyOnDelete) {
+                throw new DatabaseException("category is referenced",
+                        new SQLException("foreign key", "23000", 1451));
+            }
             if (storage.remove(id) != null) {
                 return 1;
             }

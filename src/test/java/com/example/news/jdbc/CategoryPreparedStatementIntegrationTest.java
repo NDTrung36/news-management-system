@@ -1,6 +1,9 @@
 package com.example.news.jdbc;
 
 import com.example.news.utils.DatabaseUtil;
+import com.example.news.dao.impl.GenericDAO;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.condition.EnabledIfSystemProperty;
@@ -18,12 +21,27 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 public class CategoryPreparedStatementIntegrationTest {
 
+    private static final String FIXTURE_CODE = "prepared-statement-fixture";
+
+    @BeforeEach
+    public void setUp() {
+        GenericDAO genericDAO = new GenericDAO();
+        genericDAO.delete("DELETE FROM category WHERE code = ?", FIXTURE_CODE);
+        genericDAO.insert("INSERT INTO category (name, code) VALUES (?, ?)",
+                "Prepared Statement Fixture", FIXTURE_CODE);
+    }
+
+    @AfterEach
+    public void tearDown() {
+        new GenericDAO().delete("DELETE FROM category WHERE code = ?", FIXTURE_CODE);
+    }
+
     @Test
     @DisplayName("Verify raw PreparedStatement and ResultSet query on Category with try-with-resources")
     @EnabledIfSystemProperty(named = "runDbTests", matches = "true")
     public void testSelectCategoryByCode() throws SQLException {
         String sql = "SELECT id, name, code, created_date, modified_date FROM category WHERE code = ?";
-        String targetCode = "java";
+        String targetCode = FIXTURE_CODE;
 
         long id = -1;
         String name = null;
@@ -37,7 +55,7 @@ public class CategoryPreparedStatementIntegrationTest {
             statement.setString(1, targetCode);
 
             try (ResultSet resultSet = statement.executeQuery()) {
-                assertTrue(resultSet.next(), "Category with code 'java' should exist in seed data");
+                assertTrue(resultSet.next(), "The category fixture should exist");
 
                 id = resultSet.getLong("id");
                 name = resultSet.getString("name");
@@ -50,8 +68,8 @@ public class CategoryPreparedStatementIntegrationTest {
         }
 
         assertTrue(id > 0, "Category ID should be positive");
-        assertEquals("Java", name, "Category name should match seed data");
-        assertEquals("java", code, "Category code should match query parameter");
+        assertEquals("Prepared Statement Fixture", name, "Category name should match fixture data");
+        assertEquals(FIXTURE_CODE, code, "Category code should match query parameter");
         assertNotNull(createdDate, "Created date should not be null");
     }
 }

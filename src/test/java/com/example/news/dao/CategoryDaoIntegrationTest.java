@@ -24,6 +24,8 @@ public class CategoryDaoIntegrationTest {
     private static final String UPDATED_NAME = "DAO Integration Category Updated";
     private static final String USED_CATEGORY_CODE = "dao-int-used-category";
     private static final String UNUSED_CATEGORY_CODE = "dao-int-unused-category";
+    private static final String FIND_ALL_CATEGORY_CODE = "dao-int-find-all-category";
+    private static final String LOOKUP_CATEGORY_CODE = "dao-int-lookup-category";
 
     private ICategoryDAO categoryDAO;
     private GenericDAO genericDAO;
@@ -59,15 +61,25 @@ public class CategoryDaoIntegrationTest {
         if (unusedCategory != null) {
             categoryDAO.delete(unusedCategory.getId());
         }
+        CategoryModel findAllCategory = categoryDAO.findByCode(FIND_ALL_CATEGORY_CODE);
+        if (findAllCategory != null) {
+            categoryDAO.delete(findAllCategory.getId());
+        }
+        CategoryModel lookupCategory = categoryDAO.findByCode(LOOKUP_CATEGORY_CODE);
+        if (lookupCategory != null) {
+            categoryDAO.delete(lookupCategory.getId());
+        }
     }
 
     @Test
     @DisplayName("findAll should return seed categories with properly mapped fields")
     @EnabledIfSystemProperty(named = "runDbTests", matches = "true")
     public void testFindAll() {
+        categoryDAO.insert(new CategoryModel("DAO Find All Fixture", FIND_ALL_CATEGORY_CODE));
         List<CategoryModel> categories = categoryDAO.findAll();
         assertNotNull(categories);
-        assertTrue(categories.size() >= 4, "Should have at least the 4 seed categories");
+        assertTrue(categories.stream().anyMatch(category -> FIND_ALL_CATEGORY_CODE.equals(category.getCode())),
+                "Should return the category fixture created by this test");
 
         CategoryModel first = categories.get(0);
         assertNotNull(first.getId());
@@ -80,15 +92,16 @@ public class CategoryDaoIntegrationTest {
     @DisplayName("findByCode and findById should return matching category")
     @EnabledIfSystemProperty(named = "runDbTests", matches = "true")
     public void testFindByCodeAndFindById() {
-        CategoryModel byCode = categoryDAO.findByCode("java");
+        categoryDAO.insert(new CategoryModel("DAO Lookup Fixture", LOOKUP_CATEGORY_CODE));
+        CategoryModel byCode = categoryDAO.findByCode(LOOKUP_CATEGORY_CODE);
         assertNotNull(byCode);
-        assertEquals("Java", byCode.getName());
-        assertEquals("java", byCode.getCode());
+        assertEquals("DAO Lookup Fixture", byCode.getName());
+        assertEquals(LOOKUP_CATEGORY_CODE, byCode.getCode());
 
         CategoryModel byId = categoryDAO.findById(byCode.getId());
         assertNotNull(byId);
         assertEquals(byCode.getId(), byId.getId());
-        assertEquals("Java", byId.getName());
+        assertEquals("DAO Lookup Fixture", byId.getName());
     }
 
     @Test
