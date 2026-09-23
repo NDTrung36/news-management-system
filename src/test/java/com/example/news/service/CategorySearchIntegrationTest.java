@@ -11,74 +11,90 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.condition.EnabledIfSystemProperty;
 
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Locale;
+import java.util.UUID;
+
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 @EnabledIfSystemProperty(named = "runDbTests", matches = "true")
 public class CategorySearchIntegrationTest {
 
-    private static final String CODE_PREFIX = "s6-search-";
-
     private GenericDAO genericDAO;
     private CategoryService categoryService;
+    private String codePrefix;
+    private String namePrefix;
+    private final List<Long> insertedIds = new ArrayList<>();
 
     @BeforeEach
     public void setUp() {
         genericDAO = new GenericDAO();
         categoryService = new CategoryService(new CategoryDAO());
-        cleanup();
+        String testId = UUID.randomUUID().toString().replace("-", "");
+        codePrefix = "s6-search-" + testId + "-";
+        namePrefix = "S6 " + testId + " ";
     }
 
     @AfterEach
     public void tearDown() {
-        cleanup();
+        for (Long id : insertedIds) {
+            genericDAO.delete("DELETE FROM category WHERE id = ?", id);
+        }
     }
 
     @Test
-    public void searchShouldMatchNameAndEscapeLikeWildcards() {
-        insert("S6 Java Guide", CODE_PREFIX + "java");
-        insert("S6 Percent % Guide", CODE_PREFIX + "percent");
+    public void searchShouldMatchNameAndCode() {
+        String code = codePrefix + "java";
+        insert(namePrefix + "Java Guide", code);
 
-        PageResult<CategoryModel> byName = categoryService.search(
-                new CategoryListCriteria(CODE_PREFIX + "java", "name", "asc", 1));
-        PageResult<CategoryModel> byLiteralPercent = categoryService.search(
-                new CategoryListCriteria("%", "name", "asc", 1));
+        assertSingleResult(namePrefix + "Java", code);
+        assertSingleResult(code, code);
+    }
 
-        assertEquals(1L, byName.getTotalItems());
-        assertEquals("s6-search-java", byName.getItems().get(0).getCode());
-        assertEquals(1L, byLiteralPercent.getTotalItems());
-        assertEquals("s6-search-percent", byLiteralPercent.getItems().get(0).getCode());
+    @Test
+    public void searchShouldTreatPercentUnderscoreAndExclamationAsLiterals() {
+        insert(namePrefix + "pct%match", codePrefix + "percent");
+        insert(namePrefix + "pctXmatch", codePrefix + "percent-other");
+        insert(namePrefix + "under_name", codePrefix + "underscore");
+        insert(namePrefix + "underXname", codePrefix + "underscore-other");
+        insert(namePrefix + "bang!name", codePrefix + "exclamation");
+        insert(namePrefix + "bangXname", codePrefix + "exclamation-other");
+
+        assertSingleResult(namePrefix + "pct%", codePrefix + "percent");
+        assertSingleResult(namePrefix + "under_", codePrefix + "underscore");
+        assertSingleResult(namePrefix + "bang!", codePrefix + "exclamation");
     }
 
     @Test
     public void searchShouldPaginateAndSortWithStableWhitelistedOrder() {
         for (int index = 1; index <= 21; index++) {
-            String suffix = String.format("%02d", index);
-            insert("S6 Page " + suffix, CODE_PREFIX + "page-" + suffix);
+            String suffix = String.format(Locale.ROOT, "%02d", index);
+            insert(namePrefix + "Page " + suffix, codePrefix + "page-" + suffix);
         }
 
         PageResult<CategoryModel> secondPage = categoryService.search(
-                new CategoryListCriteria(CODE_PREFIX + "page-", "code", "asc", 2));
+                new CategoryListCriteria(codePrefix + "page-", "code", "asc", 2));
         PageResult<CategoryModel> descendingPage = categoryService.search(
-                new CategoryListCriteria(CODE_PREFIX + "page-", "code", "desc", 1));
+                new CategoryListCriteria(codePrefix + "page-", "code", "desc", 1));
 
         assertEquals(21L, secondPage.getTotalItems());
         assertEquals(3, secondPage.getTotalPages());
         assertEquals(2, secondPage.getPage());
         assertEquals(10, secondPage.getItems().size());
-        assertEquals(CODE_PREFIX + "page-11", secondPage.getItems().get(0).getCode());
+        assertEquals(codePrefix + "page-11", secondPage.getItems().get(0).getCode());
         assertTrue(secondPage.hasPrevious());
         assertTrue(secondPage.hasNext());
-        assertEquals(CODE_PREFIX + "page-21", descendingPage.getItems().get(0).getCode());
+        assertEquals(codePrefix + "page-21", descendingPage.getItems().get(0).getCode());
     }
 
     @Test
     public void invalidSortShouldFallBackToIdAndOutOfRangePageShouldBeClamped() {
-        insert("S6 First", CODE_PREFIX + "first");
-        insert("S6 Second", CODE_PREFIX + "second");
+        insert(namePrefix + "First", codePrefix + "first");
+        insert(namePrefix + "Second", codePrefix + "second");
 
-        CategoryListCriteria criteria = new CategoryListCriteria("", "id DESC, (SELECT 1)", "desc", 999);
-        criteria.setSearch(CODE_PREFIX);
+        CategoryListCriteria criteria = new CategoryListCriteria(codePrefix, "id DESC, (SELECT 1)", "desc", 999);
         PageResult<CategoryModel> result = categoryService.search(criteria);
 
         assertEquals("id", criteria.getSortName());
@@ -88,10 +104,14 @@ public class CategorySearchIntegrationTest {
     }
 
     private void insert(String name, String code) {
-        genericDAO.insert("INSERT INTO category (name, code) VALUES (?, ?)", name, code);
+        long id = genericDAO.insert("INSERT INTO category (name, code) VALUES (?, ?)", name, code);
+        insertedIds.add(id);
     }
 
-    private void cleanup() {
-        genericDAO.delete("DELETE FROM category WHERE code LIKE ?", CODE_PREFIX + "%");
+    private void assertSingleResult(String search, String expectedCode) {
+        PageResult<CategoryModel> result = categoryService.search(
+                new CategoryListCriteria(search, "name", "asc", 1));
+        assertEquals(1L, result.getTotalItems());
+        assertEquals(expectedCode, result.getItems().get(0).getCode());
     }
 }

@@ -212,9 +212,7 @@ public class CategoryService implements ICategoryService {
         while (current != null) {
             if (current instanceof java.sql.SQLException) {
                 java.sql.SQLException sqlException = (java.sql.SQLException) current;
-                if (sqlException.getErrorCode() == 1062
-                        || (sqlException.getSQLState() != null
-                        && sqlException.getSQLState().startsWith("23"))) {
+                if (sqlException.getErrorCode() == 1062) {
                     return true;
                 }
             }

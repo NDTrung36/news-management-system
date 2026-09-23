@@ -21,6 +21,7 @@ import java.sql.SQLException;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -198,12 +199,33 @@ public class CategoryServiceTest {
     @Test
     @DisplayName("create should map a concurrent duplicate code to validation error")
     public void testCreateConcurrentDuplicateCode() {
-        fakeCategoryDAO.throwDuplicateOnInsert = true;
+        fakeCategoryDAO.insertFailure = new DatabaseException("duplicate category code",
+                new SQLException("duplicate", "23000", 1062));
 
         ValidationException ex = assertThrows(ValidationException.class,
                 () -> categoryService.create(new CategoryModel("Java", "java")));
 
         assertTrue(ex.getMessage().contains("already exists"));
+    }
+
+    @Test
+    @DisplayName("non-duplicate integrity errors should remain database errors")
+    public void testNonDuplicateIntegrityErrorsAreNotReportedAsDuplicateCodes() {
+        DatabaseException insertFailure = new DatabaseException("other integrity error",
+                new SQLException("foreign key", "23000", 1451));
+        fakeCategoryDAO.insertFailure = insertFailure;
+
+        assertSame(insertFailure, assertThrows(DatabaseException.class,
+                () -> categoryService.create(new CategoryModel("Java", "java"))));
+
+        fakeCategoryDAO.insertFailure = null;
+        long id = categoryService.create(new CategoryModel("Java", "java"));
+        DatabaseException updateFailure = new DatabaseException("other integrity error",
+                new SQLException("foreign key", "23000", 1451));
+        fakeCategoryDAO.updateFailure = updateFailure;
+
+        assertSame(updateFailure, assertThrows(DatabaseException.class,
+                () -> categoryService.update(new CategoryModel(id, "Java News", "java"))));
     }
 
     @Test
@@ -222,7 +244,8 @@ public class CategoryServiceTest {
         private final Map<Long, CategoryModel> storage = new HashMap<>();
         private final Map<Long, Long> newsCountMap = new HashMap<>();
         private long autoIncrementId = 1L;
-        private boolean throwDuplicateOnInsert;
+        private DatabaseException insertFailure;
+        private DatabaseException updateFailure;
         private boolean throwForeignKeyOnDelete;
 
         public void setNewsCount(Long categoryId, Long count) {
@@ -275,9 +298,8 @@ public class CategoryServiceTest {
 
         @Override
         public long insert(CategoryModel category) {
-            if (throwDuplicateOnInsert) {
-                throw new DatabaseException("duplicate category code",
-                        new SQLException("duplicate", "23000", 1062));
+            if (insertFailure != null) {
+                throw insertFailure;
             }
             long newId = autoIncrementId++;
             CategoryModel saved = new CategoryModel(newId, category.getName(), category.getCode());
@@ -287,6 +309,9 @@ public class CategoryServiceTest {
 
         @Override
         public int update(CategoryModel category) {
+            if (updateFailure != null) {
+                throw updateFailure;
+            }
             if (storage.containsKey(category.getId())) {
                 storage.put(category.getId(), category);
                 return 1;

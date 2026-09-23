@@ -6,6 +6,8 @@ import java.util.List;
 
 public class PageResult<T> {
 
+    private static final int PAGE_WINDOW_SIZE = 5;
+
     private final List<T> items;
     private final int page;
     private final int pageSize;
@@ -40,6 +42,22 @@ public class PageResult<T> {
 
     public int getTotalPages() {
         return totalPages;
+    }
+
+    public int getFirstVisiblePage() {
+        if (totalPages <= 0) {
+            return 0;
+        }
+        int currentPage = Math.min(Math.max(page, 1), totalPages);
+        int centeredStart = Math.max(1, currentPage - PAGE_WINDOW_SIZE / 2);
+        return Math.min(centeredStart, Math.max(1, totalPages - PAGE_WINDOW_SIZE + 1));
+    }
+
+    public int getLastVisiblePage() {
+        if (totalPages <= 0) {
+            return 0;
+        }
+        return Math.min(totalPages, getFirstVisiblePage() + PAGE_WINDOW_SIZE - 1);
     }
 
     public boolean hasPrevious() {

@@ -119,7 +119,7 @@
                 <a href="${previousUrl}" class="btn btn-secondary">Previous</a>
             </c:if>
 
-            <c:forEach begin="1" end="${pageResult.totalPages}" var="pageNumber">
+            <c:forEach begin="${pageResult.firstVisiblePage}" end="${pageResult.lastVisiblePage}" var="pageNumber">
                 <c:url var="pageUrl" value="/admin/category">
                     <c:param name="search" value="${criteria.search}" />
                     <c:param name="sortName" value="${criteria.sortName}" />
