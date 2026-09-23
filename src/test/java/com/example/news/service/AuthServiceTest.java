@@ -13,7 +13,9 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
 import java.util.HashMap;
+import java.util.LinkedHashSet;
 import java.util.Map;
+import java.util.Set;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -26,11 +28,14 @@ public class AuthServiceTest {
 
     private FakeUserDAO userDAO;
     private IAuthService authService;
+    private Set<String> loginRoleCodes;
 
     @BeforeEach
     public void setUp() {
         userDAO = new FakeUserDAO();
-        authService = new AuthService(userDAO, new FakePasswordHasher());
+        loginRoleCodes = new LinkedHashSet<>();
+        loginRoleCodes.add("USER");
+        authService = new AuthService(userDAO, userId -> loginRoleCodes, new FakePasswordHasher());
     }
 
     @Test
@@ -94,6 +99,26 @@ public class AuthServiceTest {
         assertEquals("user-one", user.getUsername());
         assertEquals("User One", user.getFullName());
         assertNotNull(user.getId());
+        assertTrue(user.hasRole("USER"));
+    }
+
+    @Test
+    public void loginShouldIncludeAllAssignedRoles() {
+        authService.register(new RegisterForm("admin", "secret1", "secret1", "Admin", "admin@example.com"));
+        loginRoleCodes.add("ADMIN");
+
+        AuthenticatedUser user = authService.login("admin", "secret1");
+
+        assertTrue(user.hasRole("USER"));
+        assertTrue(user.hasRole("ADMIN"));
+    }
+
+    @Test
+    public void loginShouldRejectAccountWithoutAnyRole() {
+        authService.register(new RegisterForm("user-one", "secret1", "secret1", "User One", "one@example.com"));
+        loginRoleCodes.clear();
+
+        assertThrows(AuthenticationException.class, () -> authService.login("user-one", "secret1"));
     }
 
     @Test

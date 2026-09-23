@@ -9,6 +9,7 @@ import java.lang.reflect.Method;
 import java.lang.reflect.Proxy;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.Collections;
 
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
@@ -24,7 +25,7 @@ public class AuthSessionAndCsrfTokenManagerTest {
         TestSession oldSession = request.getOrCreateSession();
         oldSession.attributes.put("anonymous", "value");
 
-        AuthenticatedUser user = new AuthenticatedUser(1L, "demo", "Demo User");
+        AuthenticatedUser user = new AuthenticatedUser(1L, "demo", "Demo User", Collections.singleton("USER"));
         authSession.signIn(request.proxy, user);
 
         TestSession newSession = request.getOrCreateSession();

@@ -55,6 +55,7 @@
                             <td class="actions">
                                 <a href="${pageContext.request.contextPath}/admin/category?action=edit&amp;id=${cat.id}" class="btn btn-secondary">Edit</a>
                                 <form method="post" action="${pageContext.request.contextPath}/admin/category?action=delete">
+                                    <input type="hidden" name="_csrf" value="<c:out value='${csrfToken}' />">
                                     <input type="hidden" name="id" value="<c:out value='${cat.id}' />">
                                     <button type="submit" class="btn btn-danger" onclick="return confirm('Are you sure you want to delete this category?');">Delete</button>
                                 </form>

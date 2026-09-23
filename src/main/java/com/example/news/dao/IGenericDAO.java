@@ -18,7 +18,7 @@ public interface IGenericDAO {
 
     long count(String sql, Object... parameters);
 
-    <T> T executeInTransaction(TransactionCallback<T> callback);
+    <T> T executeInTransaction(TransactionCallback<T> callback); //thực hiện nhiều thao tác trong một transaction.
 
     @FunctionalInterface
     interface TransactionCallback<T> {

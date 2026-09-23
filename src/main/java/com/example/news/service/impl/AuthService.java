@@ -11,8 +11,10 @@ import com.example.news.security.AuthenticatedUser;
 import com.example.news.security.BCryptPasswordHasher;
 import com.example.news.security.PasswordHasher;
 import com.example.news.service.IAuthService;
+import com.example.news.service.IRoleService;
 
 import java.nio.charset.StandardCharsets;
+import java.util.Set;
 import java.util.regex.Pattern;
 
 public class AuthService implements IAuthService {
@@ -27,15 +29,17 @@ public class AuthService implements IAuthService {
     private static final String INVALID_CREDENTIALS_MESSAGE = "Username hoặc password không đúng. Vui lòng kiểm tra và thử lại.";
 
     private final IUserDAO userDAO;
+    private final IRoleService roleService;
     private final PasswordHasher passwordHasher;
     private final String dummyPasswordHash;
 
     public AuthService() {
-        this(new UserDAO(), new BCryptPasswordHasher());
+        this(new UserDAO(), new RoleService(), new BCryptPasswordHasher());
     }
 
-    public AuthService(IUserDAO userDAO, PasswordHasher passwordHasher) {
+    public AuthService(IUserDAO userDAO, IRoleService roleService, PasswordHasher passwordHasher) {
         this.userDAO = userDAO;
+        this.roleService = roleService;
         this.passwordHasher = passwordHasher;
         this.dummyPasswordHash = passwordHasher.hash("dummy-password-not-used");
     }
@@ -83,7 +87,12 @@ public class AuthService implements IAuthService {
             throw invalidCredentials();
         }
 
-        return new AuthenticatedUser(user.getId(), user.getUsername(), user.getFullName());
+        Set<String> roleCodes = roleService.findRoleCodesByUserId(user.getId());
+        if (roleCodes == null || roleCodes.isEmpty()) {
+            throw invalidCredentials();
+        }
+
+        return new AuthenticatedUser(user.getId(), user.getUsername(), user.getFullName(), roleCodes);
     }
 
     private void validateAndNormalize(RegisterForm form) {

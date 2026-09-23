@@ -5,6 +5,7 @@ import java.io.IOException;
 import com.example.news.security.AuthSession;
 import com.example.news.security.AuthenticatedUser;
 import com.example.news.security.CsrfTokenManager;
+import com.example.news.security.RoleCodes;
 import javax.servlet.RequestDispatcher;
 import javax.servlet.ServletException;
 import javax.servlet.annotation.WebServlet;
@@ -41,6 +42,7 @@ public class HomeController extends HttpServlet {
 
         request.setAttribute("username", username);
         request.setAttribute("authenticated", authenticated);
+        request.setAttribute("isAdmin", authenticated && user.hasRole(RoleCodes.ADMIN));
 
         RequestDispatcher dispatcher = request.getRequestDispatcher("/WEB-INF/views/home.jsp");
         dispatcher.forward(request, response);

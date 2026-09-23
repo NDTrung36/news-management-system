@@ -2,6 +2,7 @@ package com.example.news.controller.admin;
 
 import com.example.news.exception.ValidationException;
 import com.example.news.model.CategoryModel;
+import com.example.news.security.CsrfTokenManager;
 import com.example.news.service.ICategoryService;
 import com.example.news.service.impl.CategoryService;
 
@@ -17,13 +18,19 @@ import java.io.IOException;
 public class CategoryController extends HttpServlet {
 
     private final ICategoryService categoryService;
+    private final CsrfTokenManager csrfTokenManager;
 
     public CategoryController() {
-        this(new CategoryService());
+        this(new CategoryService(), new CsrfTokenManager());
     }
 
     public CategoryController(ICategoryService categoryService) {
+        this(categoryService, new CsrfTokenManager());
+    }
+
+    public CategoryController(ICategoryService categoryService, CsrfTokenManager csrfTokenManager) {
         this.categoryService = categoryService;
+        this.csrfTokenManager = csrfTokenManager;
     }
 
     @Override
@@ -31,6 +38,7 @@ public class CategoryController extends HttpServlet {
             throws ServletException, IOException {
         request.setCharacterEncoding("UTF-8");
         response.setContentType("text/html;charset=UTF-8");
+        prepareCsrfToken(request);
 
         String action = request.getParameter("action");
         if (action == null) {
@@ -55,6 +63,12 @@ public class CategoryController extends HttpServlet {
             throws ServletException, IOException {
         request.setCharacterEncoding("UTF-8");
         response.setContentType("text/html;charset=UTF-8");
+
+        if (!csrfTokenManager.isValid(request)) {
+            response.sendError(HttpServletResponse.SC_FORBIDDEN);
+            return;
+        }
+        prepareCsrfToken(request);
 
         String action = request.getParameter("action");
         if ("create".equals(action)) {
@@ -191,5 +205,9 @@ public class CategoryController extends HttpServlet {
         } catch (NumberFormatException e) {
             return null;
         }
+    }
+
+    private void prepareCsrfToken(HttpServletRequest request) {
+        request.setAttribute("csrfToken", csrfTokenManager.ensureToken(request));
     }
 }

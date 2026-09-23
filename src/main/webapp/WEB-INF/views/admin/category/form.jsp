@@ -36,6 +36,7 @@
     </c:if>
 
     <form method="post" action="${pageContext.request.contextPath}/admin/category?action=${not empty category.id ? 'update' : 'create'}">
+        <input type="hidden" name="_csrf" value="<c:out value='${csrfToken}' />">
         <c:if test="${not empty category.id}">
             <input type="hidden" name="id" value="<c:out value='${category.id}' />">
         </c:if>
