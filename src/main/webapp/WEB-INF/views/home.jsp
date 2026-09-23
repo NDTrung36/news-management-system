@@ -14,6 +14,7 @@
         <c:when test="${authenticated}">
             <c:if test="${isAdmin}">
                 <p><a href="${pageContext.request.contextPath}/admin/category">Category Management</a></p>
+                <p><a href="${pageContext.request.contextPath}/admin/news">News Management</a></p>
             </c:if>
             <form method="post" action="${pageContext.request.contextPath}/logout">
                 <input type="hidden" name="_csrf" value="<c:out value='${csrfToken}' />">

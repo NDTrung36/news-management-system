@@ -17,6 +17,12 @@ public class UserDAO extends GenericDAO implements IUserDAO {
     private final RowMapper<UserModel> userMapper = new UserMapper();
 
     @Override
+    public UserModel findById(Long id) {
+        String sql = "SELECT " + USER_COLUMNS + " FROM `user` WHERE id = ?";
+        return queryOne(sql, userMapper, id);
+    }
+
+    @Override
     public UserModel findByUsername(String username) {
         String sql = "SELECT " + USER_COLUMNS + " FROM `user` WHERE username = ?";
         return queryOne(sql, userMapper, username);

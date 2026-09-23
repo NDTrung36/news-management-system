@@ -158,6 +158,19 @@ public class AuthServiceTest {
         private boolean throwDuplicateOnInsert;
 
         @Override
+        public UserModel findById(Long id) {
+            if (id == null) {
+                return null;
+            }
+            for (UserModel user : usersByUsername.values()) {
+                if (id.equals(user.getId())) {
+                    return user;
+                }
+            }
+            return null;
+        }
+
+        @Override
         public UserModel findByUsername(String username) {
             return usersByUsername.get(username);
         }
